@@ -30,29 +30,35 @@ service.authRefreshMiddleware = async (req, res, next) => {
         return;
     }
 
-    if (expires_at < Date.now()) {
-        const internalCredentials = await authenticationClient.refreshToken(refresh_token, APS_CLIENT_ID, {
-            clientSecret: APS_CLIENT_SECRET,
-            scopes: INTERNAL_TOKEN_SCOPES
-        });
-        const publicCredentials = await authenticationClient.refreshToken(internalCredentials.refresh_token, APS_CLIENT_ID, {
-            clientSecret: APS_CLIENT_SECRET,
-            scopes: PUBLIC_TOKEN_SCOPES
-        });
-        req.session.public_token = publicCredentials.access_token;
-        req.session.internal_token = internalCredentials.access_token;
-        req.session.refresh_token = publicCredentials.refresh_token;
-        req.session.expires_at = Date.now() + internalCredentials.expires_in * 1000;
+    try {
+        //if (expires_at < Date.now()) always create a new one
+        {
+            const internalCredentials = await authenticationClient.refreshToken(refresh_token, APS_CLIENT_ID, {
+                clientSecret: APS_CLIENT_SECRET,
+                scopes: INTERNAL_TOKEN_SCOPES
+            });
+            const publicCredentials = await authenticationClient.refreshToken(internalCredentials.refresh_token, APS_CLIENT_ID, {
+                clientSecret: APS_CLIENT_SECRET,
+                scopes: PUBLIC_TOKEN_SCOPES
+            });
+            req.session.public_token = publicCredentials.access_token;
+            req.session.internal_token = internalCredentials.access_token;
+            req.session.refresh_token = publicCredentials.refresh_token;
+            req.session.expires_at = Date.now() + internalCredentials.expires_in * 1000;
+        }
+        req.internalOAuthToken = {
+            access_token: req.session.internal_token,
+            expires_in: Math.round((req.session.expires_at - Date.now()) / 1000),
+        };
+        req.publicOAuthToken = {
+            access_token: req.session.public_token,
+            expires_in: Math.round((req.session.expires_at - Date.now()) / 1000),
+        };
+        next();
+    } catch (err) {
+        console.error(err);
+        res.status(401).end();
     }
-    req.internalOAuthToken = {
-        access_token: req.session.internal_token,
-        expires_in: Math.round((req.session.expires_at - Date.now()) / 1000),
-    };
-    req.publicOAuthToken = {
-        access_token: req.session.public_token,
-        expires_in: Math.round((req.session.expires_at - Date.now()) / 1000),
-    };
-    next();
 };
 
 service.getUserProfile = async (accessToken) => {

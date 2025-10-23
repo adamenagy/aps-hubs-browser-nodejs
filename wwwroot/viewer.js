@@ -1,13 +1,17 @@
 async function getAccessToken(callback) {
-    try {
-        const resp = await fetch('/api/auth/token');
-        if (!resp.ok)
-            throw new Error(await resp.text());
-        const { access_token, expires_in } = await resp.json();
-        callback(access_token, expires_in);
-    } catch (err) {
-        alert('Could not obtain access token. See the console for more details.');
-        console.error(err);        
+    while (true) {
+        try {
+            const resp = await fetch('/api/auth/token');
+            if (!resp.ok)
+                throw new Error(await resp.text());
+            const { access_token, expires_in } = await resp.json();
+            console.log(`Obtained access token: ${access_token}`);
+            callback(access_token, 5); // make it valid for 5 seconds
+            return;
+        } catch (err) {
+            console.error(err);        
+        }
+        await new Promise(resolve => setTimeout(resolve, 5000));
     }
 }
 
